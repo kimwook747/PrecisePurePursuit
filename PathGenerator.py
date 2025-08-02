@@ -28,7 +28,7 @@ def generate_smooth_path(waypoints, turn_radius, resolution=0.1):
     len_out = math.sqrt(v_out[0]**2 + v_out[1]**2)
 
     if len_in < 1e-6 or len_out < 1e-6:
-        return waypoints
+        return waypoints, 1e-6
 
     v_in_unit = (v_in[0] / len_in, v_in[1] / len_in)
     v_out_unit = (v_out[0] / len_out, v_out[1] / len_out)
@@ -39,7 +39,7 @@ def generate_smooth_path(waypoints, turn_radius, resolution=0.1):
 
     # 예외 상황(직선/U턴)일 때, 원본 웨이포인트를 그대로 반환한다.
     if abs(turn_angle) < math.radians(1.0) or abs(turn_angle - math.pi) < math.radians(1.0):
-        return waypoints
+        return waypoints, 180
     
     dist_to_tangent = turn_radius / math.tan(turn_angle / 2.0)
     dist_to_tangent = min(dist_to_tangent, len_in, len_out)
@@ -82,4 +82,4 @@ def generate_smooth_path(waypoints, turn_radius, resolution=0.1):
             t = i / float(num_points)
             smooth_path.append(Point(point_a_prime.x + t * (w3.x - point_a_prime.x), point_a_prime.y + t * (w3.y - point_a_prime.y)))
     
-    return smooth_path
+    return smooth_path, turn_angle

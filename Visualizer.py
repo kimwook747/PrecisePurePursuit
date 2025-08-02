@@ -1,6 +1,7 @@
 # Visualizer.py
 
 import matplotlib.pyplot as plt
+import math
 from Point import Point
 from Config import VisConfig
 
@@ -9,14 +10,14 @@ class Visualizer:
         plt.ion()
         self.fig, self.ax = plt.subplots(figsize=(10, 8))
     
-    def update_plot_realtime(self, waypoints, smooth_path, robot, w3_angle_deg):
+    def update_plot_realtime(self, waypoints, smooth_path, robot, turn_angle):
         self.ax.cla()
         
         self.ax.set_xlim(VisConfig.X_MIN, VisConfig.X_MAX)
         self.ax.set_ylim(VisConfig.Y_MIN, VisConfig.Y_MAX)
         self.ax.set_xlabel("X-coordinate (m)")
         self.ax.set_ylabel("Y-coordinate (m)")
-        self.ax.set_title(f'Path Following Simulation (W3 Angle: {w3_angle_deg:.1f}°)')
+        self.ax.set_title(f'Path Following Simulation (Turn Angle: {math.degrees(turn_angle):.1f}°)')
         self.ax.grid(True)
         self.ax.set_aspect('equal', adjustable='box')
 

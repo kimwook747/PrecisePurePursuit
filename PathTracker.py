@@ -60,8 +60,8 @@ class PathTracker:
         
         return normalize_angle(delta)
 
-    def calculate_acceleration(self, robot_velocity: float, steering_angle: float, current_path_index: int, total_path_points: int, w3_angle_deg: float):
-        # 경로가 스무딩되지 않은 원본 웨이포인트(점이 3개 이하)인 경우, 예측 감속을 건너뛴다.
+    def calculate_acceleration(self, robot_velocity: float, steering_angle: float, current_path_index: int, total_path_points: int, turn_angle: float):
+        # 경로가 스무딩되지 않은 경우, 반응 제어만 사용
         if total_path_points <= 3:
             turn_factor = abs(steering_angle) / (math.pi / 2.0)
             target_velocity = self.base_speed - self.deceleration_factor * self.base_speed * turn_factor
@@ -73,8 +73,14 @@ class PathTracker:
             current_progress = current_path_index / total_path_points
 
             if start_decel_progress < current_progress < end_decel_progress:
-                angle_rad = abs(math.radians(w3_angle_deg))
-                predictive_target_v = self.base_speed - self.deceleration_factor * self.base_speed * (angle_rad / math.pi)
+                # turn_angle이 작을수록(급커브) 감속량을 크게 함 (1/turn_angle)
+                epsilon = 1e-6
+                sharpness = (math.pi / (turn_angle + epsilon))
+                # sharpness 값을 0~1 범위로 만들기 위한 스케일링
+                weight_value = sharpness / 10.0
+                sharpness_factor = min(1.0, sharpness / 10 + weight_value) 
+
+                predictive_target_v = self.base_speed - self.deceleration_factor * self.base_speed * sharpness_factor
 
             # 반응 제어
             turn_factor = abs(steering_angle) / (math.pi / 2.0)

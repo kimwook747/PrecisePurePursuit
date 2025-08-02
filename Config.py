@@ -8,18 +8,18 @@ import math
 class ControllerConfig:
     # 퓨어 퍼슛 파라미터
     LOOKAHEAD_GAIN = 0.5      # 속도 비례 탐색 거리 게인 (k)
-    MIN_LOOKAHEAD_DIST = 1.0  # 최소 탐색 거리
+    MIN_LOOKAHEAD_DIST = 0.1  # 최소 탐색 거리
     
     # 속도 P 제어기 게인
-    KP_SPEED = 0.5
+    KP_SPEED = 1.0
 
 # -------------------
 # 로봇 설정 (Robot)
 # -------------------
 class RobotConfig:
     BASE_SPEED = 3.0 # 기본 주행 속도
-    DECELERATION_FACTOR = 1.5 # 감속 강도를 결정하는 계수
-    MIN_SPEED_AT_CORNER = 0.2 # 코너에서 허용되는 최소 속도
+    DECELERATION_FACTOR = 2.5 # 감속 강도를 결정하는 계수
+    MIN_SPEED_AT_CORNER = 0.5 # 코너에서 허용되는 최소 속도
     WHEELBASE = 0.35 # 로봇 축거 (L)
     MIN_TURN_RADIUS = 0.6 # 경로 생성 시 사용할 로봇의 최소 회전반경
 

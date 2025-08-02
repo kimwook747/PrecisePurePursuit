@@ -7,9 +7,9 @@ from PathTracker import PathTracker
 from Config import SimConfig
 
 class Simulator:
-    def __init__(self, path: list, w3_angle_deg: float):
+    def __init__(self, path: list, turn_angle: float):
         self.path = path
-        self.w3_angle_deg = w3_angle_deg
+        self.turn_anlge = turn_angle
         self.robot = Robot(initial_position=self.path[0])
         self.path_tracker = PathTracker()
         self.dt = SimConfig.DT
@@ -28,6 +28,6 @@ class Simulator:
         
         current_path_index = self.path_tracker.target_idx
         total_path_points = len(self.path)
-        acceleration = self.path_tracker.calculate_acceleration(velocity, steering_angle, current_path_index, total_path_points, self.w3_angle_deg)
+        acceleration = self.path_tracker.calculate_acceleration(velocity, steering_angle, current_path_index, total_path_points, self.turn_anlge)
         
         self.robot.update(steering_angle, acceleration, self.dt)

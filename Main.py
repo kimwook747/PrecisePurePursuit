@@ -26,10 +26,10 @@ def main():
         
         # 1. 부드러운 경로 생성 시도
         #    직선/U턴인 경우 원본 웨이포인트([w1,w2,w3])가 반환된다.
-        path_to_follow = generate_smooth_path(original_waypoints, turn_radius, SimConfig.PATH_RESOLUTION)
+        path_to_follow, turn_angle = generate_smooth_path(original_waypoints, turn_radius, SimConfig.PATH_RESOLUTION)
 
         # 2. 생성된 경로로 시뮬레이터 실행
-        simulator = Simulator(path_to_follow, w3_angle_deg)
+        simulator = Simulator(path_to_follow, turn_angle)
         
         while simulator.is_running():
             simulator.run_step()
@@ -37,7 +37,7 @@ def main():
                 original_waypoints,
                 path_to_follow, # 시각화 시 스무딩 여부 판단을 위해 전달
                 simulator.robot,
-                w3_angle_deg
+                turn_angle
             )
         
         w3_angle_deg += SimConfig.ANGLE_STEP
