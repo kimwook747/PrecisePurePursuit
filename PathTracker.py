@@ -2,7 +2,7 @@
 
 import math
 from Point import Point
-from Config import ControllerConfig, RobotConfig
+from Config import ControllerConfig, RobotConfig, SimConfig
 
 def normalize_angle(angle):
     while angle > math.pi: angle -= 2.0 * math.pi
@@ -19,6 +19,7 @@ class PathTracker:
         self.min_speed_at_corner = RobotConfig.MIN_SPEED_AT_CORNER
         self.deceleration_factor = RobotConfig.DECELERATION_FACTOR
         self.target_idx = 0
+        self.last_corner_idx = -1
 
     def _find_target_index(self, robot_position: Point, path: list, lookahead_dist: float):
         min_dist_sq = float('inf')
@@ -38,7 +39,7 @@ class PathTracker:
             self.target_idx += 1
             
         return len(path) - 1
-
+   
     def calculate_steering_angle(self, robot_position: Point, robot_heading: float, robot_velocity: float, path: list):
         Ld = self.lookahead_gain * robot_velocity + self.min_lookahead_dist
         
@@ -60,37 +61,71 @@ class PathTracker:
         
         return normalize_angle(delta)
 
-    def calculate_acceleration(self, robot_velocity: float, steering_angle: float, current_path_index: int, total_path_points: int, turn_angle: float):
-        # 경로가 스무딩되지 않은 경우, 반응 제어만 사용
-        if total_path_points <= 3:
-            turn_factor = abs(steering_angle) / (math.pi / 2.0)
-            target_velocity = self.base_speed - self.deceleration_factor * self.base_speed * turn_factor
-        else:
-            # 예측 감속 (스무딩된 경로에만 적용)
-            predictive_target_v = self.base_speed
-            start_decel_progress = 0.3
-            end_decel_progress = 0.5
-            current_progress = current_path_index / total_path_points
+    def _find_next_corner_angle(self, robot_position: Point, waypoints: list):
+        if len(waypoints) < 3:
+            return math.pi # 코너 없음
 
-            if start_decel_progress < current_progress < end_decel_progress:
-                # turn_angle이 작을수록(급커브) 감속량을 크게 함 (1/turn_angle)
+        # 로봇과 가장 가까운 웨이포인트(코너 후보) 찾기
+        min_dist_sq = float('inf')
+        closest_wp_idx = -1
+        # W1(인덱스 0)은 코너가 아니므로 1부터 탐색
+        for i in range(1, len(waypoints)):
+            # 로봇이 웨이포인트에 가까워질 때만 고려
+            dist_sq = (robot_position.x - waypoints[i].x)**2 + (robot_position.y - waypoints[i].y)**2
+            if dist_sq < min_dist_sq:
+                min_dist_sq = dist_sq
+                closest_wp_idx = i
+        
+        # 가장 가까운 웨이포인트가 코너를 형성하는지 확인 (마지막 점이 아니어야 함)
+        if closest_wp_idx <= 0 or closest_wp_idx >= len(waypoints) - 1:
+            return math.pi
+
+        w_prev = waypoints[closest_wp_idx - 1]
+        w_corner = waypoints[closest_wp_idx]
+        w_next = waypoints[closest_wp_idx + 1]
+
+        v_in = (w_prev.x - w_corner.x, w_prev.y - w_corner.y)
+        v_out = (w_next.x - w_corner.x, w_next.y - w_corner.y)
+        len_in = math.sqrt(v_in[0]**2 + v_in[1]**2)
+        len_out = math.sqrt(v_out[0]**2 + v_out[1]**2)
+        if len_in < 1e-6 or len_out < 1e-6: return math.pi
+        
+        v_in_unit = (v_in[0]/len_in, v_in[1]/len_in)
+        v_out_unit = (v_out[0]/len_out, v_out[1]/len_out)
+        dot_product = max(-1.0, min(1.0, v_in_unit[0] * v_out_unit[0] + v_in_unit[1] * v_out_unit[1]))
+        
+        return math.acos(dot_product)
+    
+    def calculate_acceleration(self, robot_velocity: float, steering_angle: float, robot_position: Point, next_corner_idx, corner_points: list):
+        # 예측 감속
+        predictive_target_v = self.base_speed
+
+        if corner_points[next_corner_idx] and next_corner_idx > self.last_corner_idx:
+            next_corner_point = corner_points[next_corner_idx]
+            point_a = next_corner_point[0]
+            turn_angle = next_corner_point[4]
+            dist_to_a = math.sqrt((robot_position.x - point_a.x)**2 + (robot_position.y - point_a.y)**2)
+
+            if dist_to_a < 0.5:
+                self.last_corner_idx = next_corner_idx
+
+            decel_zone = SimConfig.DECEL_ZONE
+            if dist_to_a < decel_zone:
+                progress = 1.0 - (dist_to_a / decel_zone)
                 epsilon = 1e-6
-                sharpness = (math.pi / (turn_angle + epsilon))
-                # sharpness 값을 0~1 범위로 만들기 위한 스케일링
+                sharpness = (math.pi / (turn_angle + epsilon))                
                 weight_value = sharpness / 10.0
                 sharpness_factor = min(1.0, sharpness / 10 + weight_value) 
+                predictive_target_v = self.base_speed - self.deceleration_factor * self.base_speed * sharpness_factor * progress
 
-                predictive_target_v = self.base_speed - self.deceleration_factor * self.base_speed * sharpness_factor
-
-            # 반응 제어
-            turn_factor = abs(steering_angle) / (math.pi / 2.0)
-            reactive_target_v = self.base_speed - self.deceleration_factor * self.base_speed * turn_factor
+        # 반응 제어
+        reactive_target_v = self.base_speed - self.deceleration_factor * self.base_speed * (abs(steering_angle) / (math.pi / 2.0))
             
-            # 두 방식 중 더 낮은 속도를 목표로 설정
-            target_velocity = min(predictive_target_v, reactive_target_v)
-        
+        # 두 방식 중 더 낮은 속도를 목표로 설정
+        target_velocity = min(predictive_target_v, reactive_target_v)
         target_velocity = max(self.min_speed_at_corner, target_velocity)
         
+        # P-제어기를 이용해 목표 속도에 도달하기 위한 가속도를 계산
         velocity_error = target_velocity - robot_velocity
         acceleration = self.kp_speed * velocity_error
         
